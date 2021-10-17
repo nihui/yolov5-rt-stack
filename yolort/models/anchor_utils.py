@@ -17,25 +17,6 @@ class AnchorGenerator(nn.Module):
         self.strides = strides
         self.anchor_grids = anchor_grids
 
-    def set_wh_weights(
-        self,
-        grid_sizes: List[List[int]],
-        dtype: torch.dtype = torch.float32,
-        device: torch.device = torch.device("cpu"),
-    ) -> Tensor:
-
-        wh_weights = []
-
-        for size, stride in zip(grid_sizes, self.strides):
-            grid_height, grid_width = size
-            stride = torch.as_tensor([stride], dtype=dtype, device=device)
-            stride = stride.view(-1, 1)
-            stride = stride.repeat(1, grid_height * grid_width * self.num_anchors)
-            stride = stride.reshape(-1, 1)
-            wh_weights.append(stride)
-
-        return torch.cat(wh_weights)
-
     def set_xy_weights(
         self,
         grid_sizes: List[List[int]],
@@ -45,15 +26,34 @@ class AnchorGenerator(nn.Module):
 
         xy_weights = []
 
+        for size, stride in zip(grid_sizes, self.strides):
+            grid_height, grid_width = size
+            stride = torch.as_tensor([stride], dtype=dtype, device=device)
+            stride = stride.view(-1, 1)
+            stride = stride.repeat(1, grid_height * grid_width * self.num_anchors)
+            stride = stride.reshape(-1, 1)
+            xy_weights.append(stride)
+
+        return torch.cat(xy_weights)
+
+    def set_wh_weights(
+        self,
+        grid_sizes: List[List[int]],
+        dtype: torch.dtype = torch.float32,
+        device: torch.device = torch.device("cpu"),
+    ) -> Tensor:
+
+        wh_weights = []
+
         for size, anchor_grid in zip(grid_sizes, self.anchor_grids):
             grid_height, grid_width = size
             anchor_grid = torch.as_tensor(anchor_grid, dtype=dtype, device=device)
             anchor_grid = anchor_grid.view(-1, 2)
             anchor_grid = anchor_grid.repeat(1, grid_height * grid_width)
             anchor_grid = anchor_grid.reshape(-1, 2)
-            xy_weights.append(anchor_grid)
+            wh_weights.append(anchor_grid)
 
-        return torch.cat(xy_weights)
+        return torch.cat(wh_weights)
 
     def grid_anchors(
         self,
@@ -91,8 +91,8 @@ class AnchorGenerator(nn.Module):
         grid_sizes = list([feature_map.shape[-2:] for feature_map in feature_maps])
         dtype, device = feature_maps[0].dtype, feature_maps[0].device
 
-        wh_weights = self.set_wh_weights(grid_sizes, dtype, device)
         xy_weights = self.set_xy_weights(grid_sizes, dtype, device)
+        wh_weights = self.set_wh_weights(grid_sizes, dtype, device)
         anchors = self.grid_anchors(grid_sizes, dtype, device)
 
-        return anchors, wh_weights, xy_weights
+        return anchors, xy_weights, wh_weights

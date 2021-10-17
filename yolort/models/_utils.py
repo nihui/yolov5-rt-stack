@@ -63,9 +63,9 @@ def decode_single(
         anchors_tupe (Tensor, Tensor, Tensor): reference boxes.
     """
 
-    pred_wh = (rel_codes[..., 0:2] * 2.0 + anchors_tuple[0]) * anchors_tuple[1]  # wh
-    pred_xy = (rel_codes[..., 2:4] * 2) ** 2 * anchors_tuple[2]  # xy
-    pred_boxes = torch.cat([pred_wh, pred_xy], dim=1)
+    pred_xy = (rel_codes[..., 0:2] * 2.0 + anchors_tuple[0]) * anchors_tuple[1]  # xy
+    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * anchors_tuple[2]  # wh
+    pred_boxes = torch.cat([pred_xy, pred_wh], dim=1)
     pred_boxes = box_convert(pred_boxes, in_fmt="cxcywh", out_fmt="xyxy")
 
     return pred_boxes
