@@ -92,11 +92,15 @@ class Detect(nn.Module):
 
                 y = x[i].sigmoid()
                 if self.inplace:
-                    y[..., 0:2] = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]
+                    y[..., 0:2] = (
+                        y[..., 0:2] * 2.0 - 0.5 + self.grid[i]
+                    ) * self.stride[i]
                     y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]
                 else:  # for YOLOv5 on AWS Inferentia https://github.com/ultralytics/yolov5/pull/2953
                     xy = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]
-                    wh = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i].view(1, self.na, 1, 1, 2)
+                    wh = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i].view(
+                        1, self.na, 1, 1, 2
+                    )
                     y = torch.cat((xy, wh, y[..., 4:]), -1)
                 z.append(y.view(bs, -1, self.no))
 
@@ -290,7 +294,8 @@ class Model(nn.Module):
 def parse_model(d, ch):  # model_dict, input_channels(3)
     LOGGER.info(
         "\n{:>3}{:>18}{:>3}{:>10}  {:<40}{:<30}".format(
-            "", "from", "n", "params", "module", "arguments")
+            "", "from", "n", "params", "module", "arguments"
+        )
     )
     anchors, nc, gd, gw = (
         d["anchors"],
@@ -299,7 +304,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         d["width_multiple"],
     )
     # number of anchors
-    na = ((len(anchors[0]) // 2) if isinstance(anchors, list) else anchors)
+    na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors
     no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
 
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
@@ -352,7 +357,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             c2 = ch[f]
 
         # module
-        m_ = (nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args))
+        m_ = nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args)
         t = str(m)[8:-2].replace("__main__.", "")  # module type
         np = sum([x.numel() for x in m_.parameters()])  # number params
         m_.i, m_.f, m_.type, m_.np = (
@@ -361,7 +366,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             t,  # type
             np,  # number params
         )
-        LOGGER.info(f'{i:>3}{str(f):>18}{n_:>3}{np:10.0f}  {t:<40}{str(args):<30}')
+        LOGGER.info(f"{i:>3}{str(f):>18}{n_:>3}{np:10.0f}  {t:<40}{str(args):<30}")
         # append to savelist
         save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)
         layers.append(m_)
