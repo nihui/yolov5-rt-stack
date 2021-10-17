@@ -92,17 +92,11 @@ class Detect(nn.Module):
 
                 y = x[i].sigmoid()
                 if self.inplace:
-                    y[..., 0:2] = (
-                        y[..., 0:2] * 2.0 - 0.5 + self.grid[i]
-                    ) * self.stride[
-                        i
-                    ]  # xy
-                    y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh
+                    y[..., 0:2] = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]
+                    y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]
                 else:  # for YOLOv5 on AWS Inferentia https://github.com/ultralytics/yolov5/pull/2953
-                    xy = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]  # xy
-                    wh = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i].view(
-                        1, self.na, 1, 1, 2
-                    )  # wh
+                    xy = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]
+                    wh = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i].view(1, self.na, 1, 1, 2)
                     y = torch.cat((xy, wh, y[..., 4:]), -1)
                 z.append(y.view(bs, -1, self.no))
 
@@ -241,10 +235,11 @@ class Model(nn.Module):
         if c:
             LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
 
-    def _initialize_biases(
-        self, cf=None
-    ):  # initialize biases into Detect(), cf is class frequency
-        # https://arxiv.org/abs/1708.02002 section 3.3
+    def _initialize_biases(self, cf=None):
+        """
+        initialize biases into Detect(), cf is class frequency
+        https://arxiv.org/abs/1708.02002 section 3.3
+        """
         m = self.model[-1]  # Detect() module
         for mi, s in zip(m.m, m.stride):  # from
             b = mi.bias.view(m.na, -1)  # conv.bias(255) to (3,85)
@@ -267,12 +262,10 @@ class Model(nn.Module):
                 % (mi.weight.shape[1], *b[:5].mean(1).tolist(), b[5:].mean())
             )
 
-    # def _print_weights(self):
-    #     for m in self.model.modules():
-    #         if type(m) is Bottleneck:
-    #             LOGGER.info('%10.3g' % (m.w.detach().sigmoid() * 2))  # shortcut weights
-
-    def fuse(self):  # fuse model Conv2d() + BatchNorm2d() layers
+    def fuse(self):
+        """
+        fuse model Conv2d() + BatchNorm2d() layers
+        """
         LOGGER.info("Fusing layers... ")
         for m in self.model.modules():
             if isinstance(m, (Conv, DWConv)) and hasattr(m, "bn"):
@@ -296,8 +289,8 @@ class Model(nn.Module):
 
 def parse_model(d, ch):  # model_dict, input_channels(3)
     LOGGER.info(
-        "\n%3s%18s%3s%10s  %-40s%-30s"
-        % ("", "from", "n", "params", "module", "arguments")
+        "\n{:>3}{:>18}{:>3}{:>10}  {:<40}{:<30}".format(
+            "", "from", "n", "params", "module", "arguments")
     )
     anchors, nc, gd, gw = (
         d["anchors"],
@@ -305,15 +298,14 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         d["depth_multiple"],
         d["width_multiple"],
     )
-    na = (
-        (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors
-    )  # number of anchors
+    # number of anchors
+    na = ((len(anchors[0]) // 2) if isinstance(anchors, list) else anchors)
     no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
 
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
-    for i, (f, n, m, args) in enumerate(
-        d["backbone"] + d["head"]
-    ):  # from, number, module, args
+
+    # (from, number, module, args)
+    for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):
         m = eval(m) if isinstance(m, str) else m  # eval strings
         for j, a in enumerate(args):
             try:
@@ -359,9 +351,8 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         else:
             c2 = ch[f]
 
-        m_ = (
-            nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args)
-        )  # module
+        # module
+        m_ = (nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args))
         t = str(m)[8:-2].replace("__main__.", "")  # module type
         np = sum([x.numel() for x in m_.parameters()])  # number params
         m_.i, m_.f, m_.type, m_.np = (
@@ -370,10 +361,9 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             t,  # type
             np,  # number params
         )
-        LOGGER.info("%3s%18s%3s%10.0f  %-40s%-30s" % (i, f, n_, np, t, args))  # print
-        save.extend(
-            x % i for x in ([f] if isinstance(f, int) else f) if x != -1
-        )  # append to savelist
+        LOGGER.info(f'{i:>3}{str(f):>18}{n_:>3}{np:10.0f}  {t:<40}{str(args):<30}')
+        # append to savelist
+        save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)
         layers.append(m_)
         if i == 0:
             ch = []
