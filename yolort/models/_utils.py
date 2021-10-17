@@ -8,7 +8,8 @@ from torchvision.ops import box_convert, box_iou
 
 def _evaluate_iou(target, pred):
     """
-    Evaluate intersection over union (IOU) for target from dataset and output prediction from model
+    Evaluate intersection over union (IOU) for target from dataset and
+    output prediction from model
     """
     if pred["boxes"].shape[0] == 0:
         # no box detected, 0 IOU
@@ -34,8 +35,7 @@ def _make_divisible(v: float, divisor: int, min_value: Optional[int] = None) -> 
 
 def encode_single(reference_boxes: Tensor, anchors: Tensor) -> Tensor:
     """
-    Encode a set of anchors with respect to some
-    reference boxes
+    Encode a set of anchors with respect to some reference boxes
 
     Args:
         reference_boxes (Tensor): reference boxes
@@ -58,13 +58,13 @@ def decode_single(
     From a set of original boxes and encoded relative box offsets,
     get the decoded boxes.
 
-    Arguments:
+    Args:
         rel_codes (Tensor): encoded boxes
         anchors_tupe (Tensor, Tensor, Tensor): reference boxes.
     """
 
-    pred_xy = (rel_codes[..., 0:2] * 2.0 + anchors_tuple[0]) * anchors_tuple[1]  # xy
-    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * anchors_tuple[2]  # wh
+    pred_xy = (rel_codes[..., 0:2] * 2.0 + anchors_tuple[0]) * anchors_tuple[1]
+    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * anchors_tuple[2]
     pred_boxes = torch.cat([pred_xy, pred_wh], dim=1)
     pred_boxes = box_convert(pred_boxes, in_fmt="cxcywh", out_fmt="xyxy")
 
@@ -99,10 +99,10 @@ def bbox_iou(box1: Tensor, box2: Tensor, x1y1x2y2: bool = True, eps: float = 1e-
 
     iou = inter / union
 
-    cw = torch.max(b1_x2, b2_x2) - torch.min(
-        b1_x1, b2_x1
-    )  # convex (smallest enclosing box) width
-    ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)  # convex height
+    # convex (smallest enclosing box) width
+    cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)
+    # convex height
+    ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)
     # Complete IoU https://arxiv.org/abs/1911.08287v1
     c2 = cw ** 2 + ch ** 2 + eps  # convex diagonal squared
     rho2 = (
@@ -151,7 +151,7 @@ class FocalLoss(nn.Module):
 
         if self.reduction == "mean":
             return loss.mean()
-        elif self.reduction == "sum":
+        if self.reduction == "sum":
             return loss.sum()
-        else:  # 'none'
-            return loss
+        # 'none'
+        return loss
