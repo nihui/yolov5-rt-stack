@@ -101,7 +101,7 @@ class YOLO(nn.Module):
             criterion = SetCriterion(
                 anchor_generator.num_anchors,
                 anchor_generator.strides,
-                anchor_generator.anchor_grids,
+                anchor_generator.anchors,
                 num_classes,
             )
         self.compute_loss = criterion

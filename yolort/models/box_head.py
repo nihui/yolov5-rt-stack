@@ -103,7 +103,7 @@ class SetCriterion:
         self,
         num_anchors: int,
         strides: List[int],
-        anchor_grids: List[List[float]],
+        anchors: Tensor,
         num_classes: int,
         fl_gamma: float = 0.0,
         box_gain: float = 0.05,
@@ -115,12 +115,12 @@ class SetCriterion:
         label_smoothing: float = 0.0,
         auto_balance: bool = False,
     ) -> None:
-        assert len(strides) == len(anchor_grids)
+        assert len(strides) == anchors.shape[0]
 
         self.num_anchors = num_anchors
         self.num_classes = num_classes
         self.strides = strides
-        self.anchor_grids = anchor_grids
+        self.anchors = anchors
 
         self.balance = [4.0, 1.0, 0.4]
         self.ssi = 0  # stride 16 index
@@ -160,16 +160,13 @@ class SetCriterion:
                 of the model for the format
         """
         device = targets.device
-        anchor_grids = torch.as_tensor(
-            self.anchor_grids, dtype=torch.float32, device=device
-        ).view(self.num_anchors, -1, 2)
         strides = torch.as_tensor(
             self.strides, dtype=torch.float32, device=device
         ).view(-1, 1, 1)
-        anchor_grids /= strides
+        anchors = self.anchors / strides
 
         target_cls, target_box, indices, anchors = self.build_targets(
-            targets, head_outputs, anchor_grids
+            targets, head_outputs, anchors
         )
 
         pos_weight_cls = torch.as_tensor([self.cls_pos], device=device)
