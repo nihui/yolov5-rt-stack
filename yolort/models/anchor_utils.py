@@ -16,8 +16,7 @@ class AnchorGenerator(nn.Module):
         self.num_layers = len(anchor_grids)
         self.num_anchors = len(anchor_grids[0]) // 2
         self.register_buffer(
-            'anchors',
-            torch.tensor(anchor_grids).float().view(self.num_layers, -1, 2)
+            "anchors", torch.tensor(anchor_grids).float().view(self.num_layers, -1, 2)
         )
         self.strides = strides
 
@@ -34,17 +33,23 @@ class AnchorGenerator(nn.Module):
             grid_height, grid_width = size
 
             # For output anchor, compute [x_center, y_center, x_center, y_center]
-            shifts_x = torch.arange(
-                0, grid_width, dtype=torch.int32, device=device
-            ).to(dtype=dtype)
+            shifts_x = torch.arange(0, grid_width, dtype=torch.int32, device=device).to(
+                dtype=dtype
+            )
             shifts_y = torch.arange(
                 0, grid_height, dtype=torch.int32, device=device
             ).to(dtype=dtype)
 
             shift_y, shift_x = torch.meshgrid(shifts_y, shifts_x)
 
-            grid = torch.stack((shift_x, shift_y), 2).expand((1, self.num_anchors, grid_height, grid_width, 2))
-            anchor_grid = (self.anchors[i].clone() * self.strides[i]).view((1, self.num_anchors, 1, 1, 2)).expand((1, self.num_anchors, grid_height, grid_width, 2))
+            grid = torch.stack((shift_x, shift_y), 2).expand(
+                (1, self.num_anchors, grid_height, grid_width, 2)
+            )
+            anchor_grid = (
+                (self.anchors[i].clone() * self.strides[i])
+                .view((1, self.num_anchors, 1, 1, 2))
+                .expand((1, self.num_anchors, grid_height, grid_width, 2))
+            )
 
             grids.append(grid)
             anchor_grids.append(anchor_grid)
