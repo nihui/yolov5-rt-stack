@@ -33,8 +33,12 @@ class AnchorGenerator(nn.Module):
             height, width = sizes
 
             # For output anchor, compute [x_center, y_center, x_center, y_center]
-            widths = torch.arange(0, width, dtype=torch.int32, device=device).to(dtype=dtype)
-            heights = torch.arange(0, height, dtype=torch.int32, device=device).to(dtype=dtype)
+            widths = torch.arange(0, width, dtype=torch.int32, device=device).to(
+                dtype=dtype
+            )
+            heights = torch.arange(0, height, dtype=torch.int32, device=device).to(
+                dtype=dtype
+            )
 
             shift_y, shift_x = torch.meshgrid(heights, widths)
 
