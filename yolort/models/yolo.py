@@ -116,7 +116,12 @@ class YOLO(nn.Module):
         self.head = head
 
         if post_process is None:
-            post_process = PostProcess(score_thresh, nms_thresh, detections_per_img)
+            post_process = PostProcess(
+                anchor_generator.strides,
+                score_thresh,
+                nms_thresh,
+                detections_per_img,
+            )
         self.post_process = post_process
 
         # used only on torchscript mode
@@ -157,7 +162,7 @@ class YOLO(nn.Module):
         head_outputs = self.head(features)
 
         # create the set of anchors
-        anchors_tuple = self.anchor_generator(features)
+        grids, anchors = self.anchor_generator(features)
         losses = {}
         detections: List[Dict[str, Tensor]] = []
 
@@ -167,7 +172,7 @@ class YOLO(nn.Module):
             losses = self.compute_loss(targets, head_outputs)
         else:
             # compute the detections
-            detections = self.post_process(head_outputs, anchors_tuple)
+            detections = self.post_process(head_outputs, grids, anchors)
 
         if torch.jit.is_scripting():
             if not self._has_warned:

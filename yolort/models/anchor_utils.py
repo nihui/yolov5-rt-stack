@@ -13,30 +13,27 @@ class AnchorGenerator(nn.Module):
     ):
         super().__init__()
         assert len(strides) == len(anchor_grids)
+        self.strides = strides
         self.num_layers = len(anchor_grids)
         self.num_anchors = len(anchor_grids[0]) // 2
         self.register_buffer(
             "anchors", torch.tensor(anchor_grids).float().view(self.num_layers, -1, 2)
         )
-        self.strides = strides
 
-    def _generate_anchor_grids(
+    def _generate_grids(
         self,
         grid_sizes: List[List[int]],
         dtype: torch.dtype = torch.float32,
         device: torch.device = torch.device("cpu"),
-    ) -> Tuple[List[Tensor], List[Tensor]]:
+    ) -> List[Tensor]:
+
         grids = []
-        anchor_grids = []
-
-        for i, sizes in enumerate(grid_sizes):
-            height, width = sizes
-
+        for (height, width) in grid_sizes:
             # For output anchor, compute [x_center, y_center, x_center, y_center]
-            widths = torch.arange(0, width, dtype=torch.int32, device=device).to(
+            widths = torch.arange(width, dtype=torch.int32, device=device).to(
                 dtype=dtype
             )
-            heights = torch.arange(0, height, dtype=torch.int32, device=device).to(
+            heights = torch.arange(height, dtype=torch.int32, device=device).to(
                 dtype=dtype
             )
 
@@ -45,18 +42,26 @@ class AnchorGenerator(nn.Module):
             grid = torch.stack((shift_x, shift_y), 2).expand(
                 (1, self.num_anchors, height, width, 2)
             )
-            anchor_grid = (
+            grids.append(grid)
+
+        return grids
+
+    def _generate_anchors(self, grid_sizes: List[List[int]]) -> List[Tensor]:
+
+        anchors = []
+        for i, (height, width) in enumerate(grid_sizes):
+            anchor = (
                 (self.anchors[i].clone() * self.strides[i])
                 .view((1, self.num_anchors, 1, 1, 2))
                 .expand((1, self.num_anchors, height, width, 2))
-            )
+            ).float()
+            anchors.append(anchor)
 
-            grids.append(grid)
-            anchor_grids.append(anchor_grid)
-        return grids, anchor_grids
+        return anchors
 
     def forward(self, feature_maps: List[Tensor]) -> Tuple[List[Tensor], List[Tensor]]:
         grid_sizes = list([feature_map.shape[-2:] for feature_map in feature_maps])
         dtype, device = feature_maps[0].dtype, feature_maps[0].device
-        grids, anchor_grids = self._generate_anchor_grids(grid_sizes, dtype, device)
-        return grids, anchor_grids
+        grids = self._generate_grids(grid_sizes, dtype, device)
+        anchors = self._generate_anchors(grid_sizes)
+        return grids, anchors

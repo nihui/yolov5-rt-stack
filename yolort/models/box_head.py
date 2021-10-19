@@ -5,7 +5,7 @@ from typing import Tuple, List, Dict
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torchvision.ops import boxes as box_ops
+from torchvision.ops import box_convert, boxes as box_ops
 
 from . import _utils as det_utils
 
@@ -346,17 +346,20 @@ class PostProcess(nn.Module):
 
     def __init__(
         self,
+        strides: List[int],
         score_thresh: float,
         nms_thresh: float,
         detections_per_img: int,
     ) -> None:
         """
         Args:
+            strides (List[int]): Strides of the AnchorGenerator
             score_thresh (float): Score threshold used for postprocessing the detections.
             nms_thresh (float): NMS threshold used for postprocessing the detections.
             detections_per_img (int): Number of best detections to keep after NMS.
         """
         super().__init__()
+        self.strides = strides
         self.score_thresh = score_thresh
         self.nms_thresh = nms_thresh
         self.detections_per_img = detections_per_img
@@ -364,7 +367,8 @@ class PostProcess(nn.Module):
     def forward(
         self,
         head_outputs: List[Tensor],
-        anchors_tuple: Tuple[Tensor, Tensor, Tensor],
+        grids: List[Tensor],
+        anchors: List[Tensor],
     ) -> List[Dict[str, Tensor]]:
         """
         Perform the computation. At test time, postprocess_detections is the final layer of YOLO.
@@ -375,27 +379,35 @@ class PostProcess(nn.Module):
         Args:
             head_outputs (List[Tensor]): The predicted locations and class/object confidence,
                 shape of the element is (N, A, H, W, K).
-            anchors_tuple (Tuple[Tensor, Tensor, Tensor]):
+            grids (Tensor): Grids.
+            anchors (Tensor): Anchor shifts.
         """
         batch_size, _, _, _, K = head_outputs[0].shape
 
+        # Decode bounding box with the anchors and grids
         all_pred_logits = []
-        for pred_logits in head_outputs:
-            pred_logits = pred_logits.reshape(batch_size, -1, K)  # Size=(N, HWA, K)
-            all_pred_logits.append(pred_logits)
+
+        for i, head_output in enumerate(head_outputs):
+            head_feature = head_output.sigmoid()
+            centers, shifts = det_utils.decode_single(
+                head_feature[..., :4],
+                grids[i],
+                anchors[i],
+                self.strides[i],
+            )
+            pred_logits = torch.cat((centers, shifts, head_feature[..., 4:]), dim=-1)
+            all_pred_logits.append(pred_logits.reshape(batch_size, -1, K))
 
         all_pred_logits = torch.cat(all_pred_logits, dim=1)
 
         detections: List[Dict[str, Tensor]] = []
 
         for idx in range(batch_size):  # image idx, image inference
-            pred_logits = torch.sigmoid(all_pred_logits[idx])
-
+            pred_logits = all_pred_logits[idx]
             # Compute conf
             # box_conf x class_conf, w/ shape: num_anchors x num_classes
             scores = pred_logits[:, 5:] * pred_logits[:, 4:5]
-
-            boxes = det_utils.decode_single(pred_logits[:, :4], anchors_tuple)
+            boxes = box_convert(pred_logits[:, :4], in_fmt="cxcywh", out_fmt="xyxy")
 
             # remove low scoring boxes
             inds, labels = torch.where(scores > self.score_thresh)

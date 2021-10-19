@@ -1,9 +1,9 @@
 import math
-from typing import Tuple, Optional
+from typing import List, Tuple, Optional
 
 import torch
 from torch import nn, Tensor
-from torchvision.ops import box_convert, box_iou
+from torchvision.ops import box_iou
 
 
 def _evaluate_iou(target, pred):
@@ -52,23 +52,24 @@ def encode_single(reference_boxes: Tensor, anchors: Tensor) -> Tensor:
 
 def decode_single(
     rel_codes: Tensor,
-    anchors_tuple: Tuple[Tensor, Tensor, Tensor],
-) -> Tensor:
+    grid: Tensor,
+    anchor: Tensor,
+    stride: List[int],
+) -> Tuple[Tensor, Tensor]:
     """
     From a set of original boxes and encoded relative box offsets,
     get the decoded boxes.
 
     Args:
-        rel_codes (Tensor): encoded boxes
-        anchors_tupe (Tensor, Tensor, Tensor): reference boxes.
+        rel_codes (Tensor): Encoded boxes
+        grid (Tensor): Anchor grids
+        anchor (Tensor): Anchor shifts
+        stride (int): Stride
     """
+    pred_xy = (rel_codes[..., 0:2] * 2.0 - 0.5 + grid) * stride
+    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * anchor
 
-    pred_xy = (rel_codes[..., 0:2] * 2.0 + anchors_tuple[0]) * anchors_tuple[1]
-    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * anchors_tuple[2]
-    pred_boxes = torch.cat([pred_xy, pred_wh], dim=1)
-    pred_boxes = box_convert(pred_boxes, in_fmt="cxcywh", out_fmt="xyxy")
-
-    return pred_boxes
+    return pred_xy, pred_wh
 
 
 def bbox_iou(box1: Tensor, box2: Tensor, x1y1x2y2: bool = True, eps: float = 1e-7):
