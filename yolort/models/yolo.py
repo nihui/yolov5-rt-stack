@@ -162,7 +162,7 @@ class YOLO(nn.Module):
         head_outputs = self.head(features)
 
         # create the set of anchors
-        grids, anchors = self.anchor_generator(features)
+        grids, shifts = self.anchor_generator(features)
         losses = {}
         detections: List[Dict[str, Tensor]] = []
 
@@ -172,7 +172,7 @@ class YOLO(nn.Module):
             losses = self.compute_loss(targets, head_outputs)
         else:
             # compute the detections
-            detections = self.post_process(head_outputs, grids, anchors)
+            detections = self.post_process(head_outputs, grids, shifts)
 
         if torch.jit.is_scripting():
             if not self._has_warned:

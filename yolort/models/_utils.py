@@ -53,7 +53,7 @@ def encode_single(reference_boxes: Tensor, anchors: Tensor) -> Tensor:
 def decode_single(
     rel_codes: Tensor,
     grid: Tensor,
-    anchor: Tensor,
+    shift: Tensor,
     stride: List[int],
 ) -> Tuple[Tensor, Tensor]:
     """
@@ -63,11 +63,11 @@ def decode_single(
     Args:
         rel_codes (Tensor): Encoded boxes
         grid (Tensor): Anchor grids
-        anchor (Tensor): Anchor shifts
+        shift (Tensor): Anchor shifts
         stride (int): Stride
     """
     pred_xy = (rel_codes[..., 0:2] * 2.0 - 0.5 + grid) * stride
-    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * anchor
+    pred_wh = (rel_codes[..., 2:4] * 2) ** 2 * shift
 
     return pred_xy, pred_wh
 

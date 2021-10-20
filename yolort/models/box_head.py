@@ -368,7 +368,7 @@ class PostProcess(nn.Module):
         self,
         head_outputs: List[Tensor],
         grids: List[Tensor],
-        anchors: List[Tensor],
+        shifts: List[Tensor],
     ) -> List[Dict[str, Tensor]]:
         """
         Perform the computation. At test time, postprocess_detections is the final layer of YOLO.
@@ -380,22 +380,23 @@ class PostProcess(nn.Module):
             head_outputs (List[Tensor]): The predicted locations and class/object confidence,
                 shape of the element is (N, A, H, W, K).
             grids (Tensor): Grids.
-            anchors (Tensor): Anchor shifts.
+            shifts (Tensor): Anchor shifts.
         """
+
         batch_size, _, _, _, K = head_outputs[0].shape
 
-        # Decode bounding box with the anchors and grids
+        # Decode bounding box with the shifts and grids
         all_pred_logits = []
 
         for i, head_output in enumerate(head_outputs):
             head_feature = head_output.sigmoid()
-            centers, shifts = det_utils.decode_single(
+            pred_xy, pred_wh = det_utils.decode_single(
                 head_feature[..., :4],
                 grids[i],
-                anchors[i],
+                shifts[i],
                 self.strides[i],
             )
-            pred_logits = torch.cat((centers, shifts, head_feature[..., 4:]), dim=-1)
+            pred_logits = torch.cat((pred_xy, pred_wh, head_feature[..., 4:]), dim=-1)
             all_pred_logits.append(pred_logits.reshape(batch_size, -1, K))
 
         all_pred_logits = torch.cat(all_pred_logits, dim=1)

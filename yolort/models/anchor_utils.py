@@ -46,22 +46,22 @@ class AnchorGenerator(nn.Module):
 
         return grids
 
-    def _generate_anchors(self, grid_sizes: List[List[int]]) -> List[Tensor]:
+    def _generate_shifts(self, grid_sizes: List[List[int]]) -> List[Tensor]:
 
-        anchors = []
+        shifts = []
         for i, (height, width) in enumerate(grid_sizes):
-            anchor = (
+            shift = (
                 (self.anchors[i].clone() * self.strides[i])
                 .view((1, self.num_anchors, 1, 1, 2))
                 .expand((1, self.num_anchors, height, width, 2))
             ).float()
-            anchors.append(anchor)
+            shifts.append(shift)
 
-        return anchors
+        return shifts
 
     def forward(self, feature_maps: List[Tensor]) -> Tuple[List[Tensor], List[Tensor]]:
         grid_sizes = list([feature_map.shape[-2:] for feature_map in feature_maps])
         dtype, device = feature_maps[0].dtype, feature_maps[0].device
         grids = self._generate_grids(grid_sizes, dtype, device)
-        anchors = self._generate_anchors(grid_sizes)
-        return grids, anchors
+        shifts = self._generate_shifts(grid_sizes)
+        return grids, shifts
